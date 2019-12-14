@@ -32,6 +32,7 @@ class Frame : public wxFrame {
 
 		wxButton *loadPalette;
 		wxButton *exportPalette;
+		wxCheckBox *transparencyToggle;
 		wxButton *loadTextures;
 		wxStaticText *textCurNumber;
 		wxButton *prev;
@@ -42,9 +43,12 @@ class Frame : public wxFrame {
 		wxButton *exportAllTextures;
 		wxButton *replaceCurrent;
 		wxButton *saveTextureFile;
+		wxButton *help;
+		wxButton *about;
 
 		void OnLoadPalette(wxCommandEvent& WXUNUSED(event));
 		void OnExportPalette(wxCommandEvent& WXUNUSED(event));
+		void OnTransparencyToggle(wxCommandEvent& WXUNUSED(event));
 		void OnLoadTextures(wxCommandEvent& WXUNUSED(event));
 		void OnPrev(wxCommandEvent& WXUNUSED(event));
 		void OnNext(wxCommandEvent& WXUNUSED(event));
@@ -53,6 +57,8 @@ class Frame : public wxFrame {
 		void OnExportAllTextures(wxCommandEvent& WXUNUSED(event));
 		void OnReplaceCurrent(wxCommandEvent& WXUNUSED(event));
 		void OnSaveTextureFile(wxCommandEvent& WXUNUSED(event));
+		void OnHelp(wxCommandEvent& WXUNUSED(event));
+		void OnAbout(wxCommandEvent& WXUNUSED(event));
 
 		std::vector <std::tuple<int, int, int>> palette;
 
@@ -75,10 +81,12 @@ class Frame : public wxFrame {
 
 		void UpdateImage();
 
-		static wxImage ImageFromBytes(const std::vector<std::tuple<int, int, int>> palette, const std::vector<unsigned char> &bytes, int start);
+		static wxImage ImageFromBytes(const std::vector<std::tuple<int, int, int>> palette, const std::vector<unsigned char> &bytes, int start, bool isFirstPaletteColourTransparent = false);
 
 		bool IsPaletteLoaded();
 		bool IsTextureFileLoaded();
 
 		void SetControlState(int state);
+
+		bool firstColourTransparent = true;
 };

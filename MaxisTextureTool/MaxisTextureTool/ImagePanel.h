@@ -16,6 +16,7 @@ public:
 	void Render(wxDC& dc);
 private:
 	wxImage image;
+	wxBitmap background;
 
 	static const int Size = 512;
 };

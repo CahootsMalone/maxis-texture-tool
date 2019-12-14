@@ -2,8 +2,10 @@
 
 wxImagePanel::wxImagePanel(wxFrame* parent, wxWindowID id) : wxPanel(parent, id, wxDefaultPosition, wxSize(Size, Size))
 {
+	wxImage::AddHandler(new wxPNGHandler);
+	background = wxBITMAP_PNG(checker);
+
 	Bind(wxEVT_PAINT, &wxImagePanel::OnPaint, this);
-	image = wxImage(Size, Size, true); // Cleared to black.
 }
 
 void wxImagePanel::SetImage(const wxImage& newImage)
@@ -43,6 +45,9 @@ void wxImagePanel::Render(wxDC& dc)
 {
 	dc.SetBackground(wxBrush(wxColour(0, 0, 0)));
 	dc.Clear();
-	dc.DrawBitmap(wxBitmap(image), 0, 0);
+	dc.DrawBitmap(background, 0, 0);
+	if (image.IsOk()) {
+		dc.DrawBitmap(wxBitmap(image), 0, 0);
+	}
 	dc.SetBackground(wxNullBrush);
 }

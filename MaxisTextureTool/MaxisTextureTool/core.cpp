@@ -9,9 +9,7 @@ bool App::OnInit()
 		return false;
 	}
 
-	//wxImage::AddHandler(new wxPNGHandler);
-
-	Frame *frame = new Frame("Test");
+	Frame *frame = new Frame("Maxis Texture Tool");
 	//frame->SetIcon(wxICON(AAAAA));
 	frame->Show(true);
 
@@ -41,19 +39,23 @@ Frame::Frame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDefaultPo
 	exportPalette->Bind(wxEVT_BUTTON, &Frame::OnExportPalette, this);
 	exportPalette->SetToolTip("Export the current palette as a PNG or a GIMP palette.");
 
+	transparencyToggle = new wxCheckBox(panel1, wxID_ANY, "Make first colour transparent");
+	transparencyToggle->Bind(wxEVT_CHECKBOX, &Frame::OnTransparencyToggle, this);
+	transparencyToggle->SetValue(firstColourTransparent);
+	transparencyToggle->SetToolTip("This affects texture export and replacement.");
+
 	loadTextures = new wxButton(panel1, wxID_ANY, "Load");
 	loadTextures->Bind(wxEVT_BUTTON, &Frame::OnLoadTextures, this);
 	loadTextures->SetToolTip("Load a Maxis composite bitmap file.");
 
 	textCurNumber = new wxStaticText(panel1, wxID_ANY, "-", wxDefaultPosition, wxDefaultSize, wxALIGN_CENTRE_HORIZONTAL | wxST_NO_AUTORESIZE);
-	textCurNumber->SetBackgroundColour(wxColour(255, 0, 0));
 
 	// Unicode values from: https://en.wikipedia.org/wiki/Geometric_Shapes
 
-	prev = new wxButton(panel1, wxID_ANY, L"\u25C0");
+	prev = new wxButton(panel1, wxID_ANY, L"\u25C0", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
 	prev->Bind(wxEVT_BUTTON, &Frame::OnPrev, this);
 
-	next = new wxButton(panel1, wxID_ANY, L"\u25B6");
+	next = new wxButton(panel1, wxID_ANY, L"\u25B6", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
 	next->Bind(wxEVT_BUTTON, &Frame::OnNext, this);
 
 	goTo = new wxButton(panel1, wxID_ANY, "Go to");
@@ -76,15 +78,28 @@ Frame::Frame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDefaultPo
 
 	saveTextureFile = new wxButton(panel1, wxID_ANY, "Save");
 	saveTextureFile->Bind(wxEVT_BUTTON, &Frame::OnSaveTextureFile, this);
+	saveTextureFile->SetToolTip("Save the Maxis composite bitmap file, including any modifications.");
+
+	help = new wxButton(panel1, wxID_ANY, "Help");
+	help->Bind(wxEVT_BUTTON, &Frame::OnHelp, this);
+
+	about = new wxButton(panel1, wxID_ANY, "About");
+	about->Bind(wxEVT_BUTTON, &Frame::OnAbout, this);
 
 	wxBoxSizer *baseSizer = new wxBoxSizer(wxVERTICAL); // Contains panel
 	wxBoxSizer *panelSizer = new wxBoxSizer(wxHORIZONTAL); // Contains everything else
 
 	wxBoxSizer *bSizer1 = new wxBoxSizer(wxVERTICAL);
+
 	wxStaticBoxSizer *sBSizerPalette = new wxStaticBoxSizer(wxVERTICAL, panel1, "Palette");
 	wxStaticBoxSizer *sBSizerTexture = new wxStaticBoxSizer(wxVERTICAL, panel1, "Textures");
-	wxBoxSizer *bSizer2a = new wxBoxSizer(wxHORIZONTAL); // For prev/next buttons.
-	wxBoxSizer *bSizer2b = new wxBoxSizer(wxHORIZONTAL); // For go to button and field.
+	wxStaticBoxSizer* sBSizerMisc = new wxStaticBoxSizer(wxHORIZONTAL, panel1, "Misc");
+
+	wxBoxSizer* bSizerLoadExportPalette = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer *bSizerPrevNext = new wxBoxSizer(wxHORIZONTAL); // For prev/next buttons.
+	wxBoxSizer *bSizerGoTo = new wxBoxSizer(wxHORIZONTAL); // For go to button and field.
+	wxBoxSizer* bSizerExport = new wxBoxSizer(wxHORIZONTAL); // For export current/all buttons.
+	wxBoxSizer* bSizerModify = new wxBoxSizer(wxHORIZONTAL); // For replace and save buttons.
 	
 	baseSizer->Add(panel1, 1, wxEXPAND | wxALL, 0);
 
@@ -93,25 +108,39 @@ Frame::Frame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDefaultPo
 
 	int margin = wxSizerFlags::GetDefaultBorder();
 
-	sBSizerPalette->Add(loadPalette, 1, wxALIGN_CENTER | wxALL, margin);
-	sBSizerPalette->Add(exportPalette, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
+	bSizerLoadExportPalette->Add(loadPalette, 1, wxALIGN_CENTER | wxALL, margin);
+	bSizerLoadExportPalette->Add(exportPalette, 1, wxALIGN_CENTER | wxRIGHT | wxTOP | wxBOTTOM, margin);
+	
+	sBSizerPalette->Add(bSizerLoadExportPalette, 0, wxEXPAND, 0);
+	sBSizerPalette->Add(transparencyToggle, 0, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
+	
 	bSizer1->Add(sBSizerPalette, 0, wxEXPAND | wxALL, margin);
 
-	sBSizerTexture->Add(loadTextures, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
-	sBSizerTexture->Add(textCurNumber, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, margin);
-	sBSizerTexture->Add(bSizer2a, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
-	sBSizerTexture->Add(bSizer2b, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
-	sBSizerTexture->Add(exportCurrentTexture, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
-	sBSizerTexture->Add(exportAllTextures, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
-	sBSizerTexture->Add(replaceCurrent, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
-	sBSizerTexture->Add(saveTextureFile, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
+	sBSizerTexture->Add(loadTextures, 0, wxALIGN_CENTER | wxALL, margin);
+	sBSizerTexture->Add(bSizerPrevNext, 0, wxEXPAND, 0);
+	sBSizerTexture->Add(bSizerGoTo, 0, wxEXPAND, 0);
+	sBSizerTexture->Add(bSizerExport, 0, wxEXPAND, 0);
+	sBSizerTexture->Add(bSizerModify, 0, wxEXPAND, 0);
+
 	bSizer1->Add(sBSizerTexture, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, margin);
 	
-	bSizer2a->Add(prev, 0, wxALIGN_CENTER, margin);
-	bSizer2a->Add(next, 0, wxALIGN_CENTER, margin);
+	bSizerPrevNext->Add(prev, 0, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
+	bSizerPrevNext->Add(textCurNumber, 1, wxEXPAND | wxRIGHT | wxBOTTOM, margin);
+	bSizerPrevNext->Add(next, 0, wxALIGN_CENTER | wxRIGHT | wxBOTTOM, margin);
 
-	bSizer2b->Add(goTo, 0, wxALIGN_CENTER, margin);
-	bSizer2b->Add(goToNumber, 0, wxALIGN_CENTER, margin);
+	bSizerGoTo->Add(goTo, 0, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
+	bSizerGoTo->Add(goToNumber, 1, wxEXPAND | wxRIGHT | wxBOTTOM, margin);
+	
+	bSizerExport->Add(exportCurrentTexture, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
+	bSizerExport->Add(exportAllTextures, 1, wxALIGN_CENTER | wxRIGHT | wxBOTTOM, margin);
+
+	bSizerModify->Add(replaceCurrent, 1, wxALIGN_CENTER | wxLEFT | wxRIGHT | wxBOTTOM, margin);
+	bSizerModify->Add(saveTextureFile, 1, wxALIGN_CENTER | wxRIGHT | wxBOTTOM, margin);
+
+	sBSizerMisc->Add(help, 1, wxALIGN_CENTER | wxALL, margin);
+	sBSizerMisc->Add(about, 1, wxALIGN_CENTER | wxRIGHT | wxTOP | wxBOTTOM, margin);
+
+	bSizer1->Add(sBSizerMisc, 0, wxEXPAND | wxALL, margin);
 
 	panel1->SetSizer(panelSizer);
 
@@ -225,6 +254,14 @@ void Frame::OnExportPalette(wxCommandEvent& WXUNUSED(event))
 		message << "Unanticipated extension (" << ext << ").";
 		wxMessageBox(message, "Error", wxOK | wxICON_ERROR);
 		return;
+	}
+}
+
+void Frame::OnTransparencyToggle(wxCommandEvent& WXUNUSED(event)) {
+	firstColourTransparent = transparencyToggle->GetValue();
+	
+	if (IsTextureFileLoaded()) {
+		UpdateImage();
 	}
 }
 
@@ -346,7 +383,7 @@ void Frame::OnExportCurrentTexture(wxCommandEvent& WXUNUSED(event))
 		return;
 	}
 
-	wxImage image = ImageFromBytes(palette, fileBytes, starts[curImage]);
+	wxImage image = ImageFromBytes(palette, fileBytes, starts[curImage], firstColourTransparent);
 	image.SaveFile(fileDialog.GetPath());
 }
 
@@ -365,7 +402,7 @@ void Frame::OnExportAllTextures(wxCommandEvent& WXUNUSED(event))
 	}
 
 	for (int i = 0; i < imageCount; ++i) {
-		wxImage image = ImageFromBytes(palette, fileBytes, starts[i]);
+		wxImage image = ImageFromBytes(palette, fileBytes, starts[i], firstColourTransparent);
 		wxFileName fileName = wxFileName::DirName(dirDialog.GetPath());
 		wxString name;
 		name << "tex" << i;
@@ -416,9 +453,15 @@ void Frame::OnReplaceCurrent(wxCommandEvent& WXUNUSED(event))
 
 	int pixelsReplacedCount = 0;
 	unsigned char *repData = replacement.GetData();
+	bool replacementHasAlphaChannel = replacement.HasAlpha();
 
 	// For colours that aren't in the palette.
 	std::unordered_map<int, int> nearestMatches;
+
+	// If the first palette colour is being treated as transparent,
+	// don't check it when mapping colours to palette indices.
+	// Otherwise pixels may end up unintentionally transparent in-game.
+	int paletteStartOffset = firstColourTransparent ? 1 : 0;
 
 	for (int curRow = 0; curRow < rowCount; ++curRow)
 	{
@@ -430,9 +473,15 @@ void Frame::OnReplaceCurrent(wxCommandEvent& WXUNUSED(event))
 
 			int address = dataStart + curCol + curRow * colCount;
 
+			if (firstColourTransparent && replacementHasAlphaChannel && replacement.GetAlpha(curCol, curRow) == wxIMAGE_ALPHA_TRANSPARENT)
+			{
+				fileBytes[address] = 0;
+				continue;
+			}
+
 			// Find exact match if possible.
 			std::vector<std::tuple<int, int, int>>::iterator it;
-			it = std::find(palette.begin(), palette.end(), std::make_tuple(newR, newG, newB));
+			it = std::find(palette.begin()+paletteStartOffset, palette.end(), std::make_tuple(newR, newG, newB));
 			if (it != palette.end())
 			{
 				fileBytes[address] = std::distance(palette.begin(), it);
@@ -454,7 +503,7 @@ void Frame::OnReplaceCurrent(wxCommandEvent& WXUNUSED(event))
 			// Find palette colour closest to new one.
 			int indexBest;
 			int minError;
-			for (int curPal = 0; curPal < palette.size(); ++curPal)
+			for (size_t curPal = paletteStartOffset; curPal < palette.size(); ++curPal)
 			{
 				int r, g, b;
 				std::tie(r, g, b) = palette[curPal];
@@ -522,9 +571,39 @@ void Frame::OnSaveTextureFile(wxCommandEvent& WXUNUSED(event)) {
 	file.Close();
 }
 
+void Frame::OnHelp(wxCommandEvent& WXUNUSED(event)) {
+	wxString message;
+	message << "This program supports SimCopter and Streets of SimCity.\n"
+		<< "Instructions:\n"
+		<< "1) Load a palette from a Maxis mesh geometry file.\n"
+		<< "        Geometry files are stored in each game's geo folder.\n"
+		<< "        They're named sim3d#.max, where # is in [1, 3].\n"
+		<< "        Once loaded, a palette can be exported as a PNG or a GIMP palette file.\n"
+		<< "2) Load a composite bitmap file (CBF).\n"
+		<< "        CBFs are stored in each game's bmp folder.\n"
+		<< "        They're the .bmp files that aren't Windows bitmaps.\n"
+		<< "        The sim3d.bmp file contains most of each game's textures.\n"
+		<< "        Textures can be exported to PNGs individually or all at once.\n"
+		<< "3) Replace textures.\n"
+		<< "        The current texture can be replaced with a PNG.\n"
+		<< "        Replacements must be the same size.\n"
+		<< "        Colours not in the current palette will be mapped to the nearest palette colour.\n"
+		<< "        If \"Make first colour transparent\" is enabled:\n"
+		<< "                Transparent pixels will be mapped to palette index 0.\n"
+		<< "                Opaque pixels will never be mapped to palette index 0.\n"
+		<< "4) Save the modified CBF.\n"
+		<< "        Back up the original CBF.\n"
+		<< "        Place the modified CBF (renamed to match the original) in the bmp folder.";
+	wxMessageBox(message, "Help", wxOK);
+}
 
-
-
+void Frame::OnAbout(wxCommandEvent& WXUNUSED(event)) {
+	wxString message;
+	message << "Maxis Texture Tool\n"
+		<< "Version 1.0.0\n"
+		<< "Created by Luke Gane (a.k.a. Cahoots Malone)";
+	wxMessageBox(message, "About", wxOK);
+}
 
 
 
@@ -539,7 +618,7 @@ void Frame::UpdateImage()
 	strCurNumber << curImage+1 << " of " << imageCount << " (" << colCount << "x" << rowCount << ")";
 	textCurNumber->SetLabel(strCurNumber);
 
-	wxImage image = ImageFromBytes(palette, fileBytes, start);
+	wxImage image = ImageFromBytes(palette, fileBytes, start, firstColourTransparent);
 	imagePanel->SetImage(image);
 }
 
@@ -595,7 +674,7 @@ void Frame::SaveImage(const wxImage &image)
 	image.SaveFile(fileDialog.GetPath());
 }
 
-wxImage Frame::ImageFromBytes(const std::vector<std::tuple<int, int, int>> palette, const std::vector<unsigned char> &bytes, int start)
+wxImage Frame::ImageFromBytes(const std::vector<std::tuple<int, int, int>> palette, const std::vector<unsigned char> &bytes, int start, bool isFirstPaletteColourTransparent)
 {
 	int colCount = Helpers::BytesToInt32(bytes.data() + start); // X
 	int rowCount = Helpers::BytesToInt32(bytes.data() + start + 4); // Y
@@ -603,6 +682,7 @@ wxImage Frame::ImageFromBytes(const std::vector<std::tuple<int, int, int>> palet
 	int dataStart = start + 3 * 4 + rowCount * 4;
 
 	wxImage out(colCount, rowCount, true);
+	out.InitAlpha();
 
 	for (int curRow = 0; curRow < rowCount; ++curRow)
 	{
@@ -612,6 +692,9 @@ wxImage Frame::ImageFromBytes(const std::vector<std::tuple<int, int, int>> palet
 			int index = bytes[address];
 			int r, g, b;
 			std::tie(r, g, b) = palette.at(index);
+			if (isFirstPaletteColourTransparent && index == 0) {
+				out.SetAlpha(curCol, curRow, wxIMAGE_ALPHA_TRANSPARENT);
+			}
 			out.SetRGB(curCol, curRow, r, g, b);
 		}
 	}
@@ -634,6 +717,7 @@ void Frame::SetControlState(int state)
 		case 0: // No palette, no texture file.
 			loadPalette->Enable();
 			exportPalette->Disable();
+			transparencyToggle->Disable();
 			loadTextures->Disable();
 			prev->Disable();
 			next->Disable();
@@ -647,6 +731,7 @@ void Frame::SetControlState(int state)
 		case 1: // Palette, no texture file.
 			loadPalette->Enable();
 			exportPalette->Enable();
+			transparencyToggle->Enable();
 			loadTextures->Enable();
 			prev->Disable();
 			next->Disable();
@@ -660,6 +745,7 @@ void Frame::SetControlState(int state)
 		case 2: // Palette and texture file.
 			loadPalette->Enable();
 			exportPalette->Enable();
+			transparencyToggle->Enable();
 			loadTextures->Enable();
 			prev->Enable();
 			next->Enable();
