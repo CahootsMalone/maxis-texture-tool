@@ -140,7 +140,7 @@ Frame::Frame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDefaultPo
 	sBSizerMisc->Add(help, 1, wxALIGN_CENTER | wxALL, margin);
 	sBSizerMisc->Add(about, 1, wxALIGN_CENTER | wxRIGHT | wxTOP | wxBOTTOM, margin);
 
-	bSizer1->Add(sBSizerMisc, 0, wxEXPAND | wxALL, margin);
+	bSizer1->Add(sBSizerMisc, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, margin);
 
 	panel1->SetSizer(panelSizer);
 
@@ -180,6 +180,26 @@ void Frame::OnLoadPalette(wxCommandEvent& WXUNUSED(event))
 	wxFile *file = inStream.GetFile();
 
 	unsigned char bytesCmapOffset[4];
+
+	int size = file->Length();
+
+	if (size < 829)
+	{
+		wxMessageBox("File is too small to contain a palette. It is probably not a Maxis mesh geometry file.", "Error", wxOK | wxICON_ERROR);
+		return;
+	}
+
+	file->Seek(12);
+	file->Read(&bytesCmapOffset, 4);
+
+	if (bytesCmapOffset[0] != 'C' ||
+		bytesCmapOffset[1] != 'M' ||
+		bytesCmapOffset[2] != 'A' ||
+		bytesCmapOffset[3] != 'P')
+	{
+		wxMessageBox("File has no CMAP signature at offset 12 (0x0C). It is probably not a Maxis mesh geometry file.", "Error", wxOK | wxICON_ERROR);
+		return;
+	}
 
 	file->Seek(16);
 	file->Read(&bytesCmapOffset, 4);
@@ -579,7 +599,7 @@ void Frame::OnHelp(wxCommandEvent& WXUNUSED(event)) {
 		<< "        Geometry files are stored in each game's geo folder.\n"
 		<< "        They're named sim3d#.max, where # is in [1, 3].\n"
 		<< "        Once loaded, a palette can be exported as a PNG or a GIMP palette file.\n"
-		<< "2) Load a composite bitmap file (CBF).\n"
+		<< "2) Load a Maxis composite bitmap file (CBF).\n"
 		<< "        CBFs are stored in each game's bmp folder.\n"
 		<< "        They're the .bmp files that aren't Windows bitmaps.\n"
 		<< "        The sim3d.bmp file contains most of each game's textures.\n"
