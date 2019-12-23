@@ -309,7 +309,27 @@ void Frame::OnLoadTextures(wxCommandEvent& WXUNUSED(event))
 
 	wxFile *file = inStream.GetFile();
 
+	int actualFileSize = file->Length();
+
 	int fileSize = ReadInt32(file, 0);
+
+	if (fileSize != actualFileSize)
+	{
+		// Check if this is a regular bitmap file.
+		unsigned char twoBytes[2];
+		file->Seek(0);
+		file->Read(&twoBytes, 2);
+
+		// Be specific if possible.
+		if (twoBytes[0] == 'B' && twoBytes[1] == 'M')
+		{
+			wxMessageBox("The file is a Windows bitmap, not a Maxis composite bitmap file.", "Error", wxOK | wxICON_ERROR);
+			return;
+		}
+
+		wxMessageBox("The file's reported size does not match its actual size. It is probably not a Maxis composite bitmap file.", "Error", wxOK | wxICON_ERROR);
+		return;
+	}
 
 	unsigned char *raw = new unsigned char[fileSize];
 	file->Seek(0);
