@@ -551,7 +551,7 @@ void Frame::OnReplaceCurrent(wxCommandEvent& WXUNUSED(event))
 				// Something perceptually-weighted would be better but this is cheap.
 				int curError = std::abs(newR - r) + std::abs(newG - g) + std::abs(newB - b);
 				
-				if (curPal == 0 || curError < minError) {
+				if (curPal == paletteStartOffset || curError < minError) {
 					indexBest = curPal;
 					minError = curError;
 				}
