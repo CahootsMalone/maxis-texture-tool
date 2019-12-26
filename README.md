@@ -15,7 +15,7 @@ Recommended for use with [SimCopterX](http://simcopter.net) or [SimStreetsX](htt
   * These are stored in each game's `bmp` folder, along with many regular Windows bitmaps.
   * Textures can be exported as PNG images individually or all at once.
   * Textures can be replaced. If the replacement texture contains colours that aren't included in the palette, they will be mapped to the nearest palette colour.
-    * It's preferable to export the palette and use it to limit the colours of the replacement texture in suitable image editing software before replacement. The mapping in the MTT is primitive (it doesn't account for the fact that [human colour sensitivity varies by wavelength](https://en.wikipedia.org/wiki/Luminosity_function)) and doesn't perform any [dithering](https://en.wikipedia.org/wiki/Dither).
+    * It's preferable to export the palette and use it to limit the colours of the replacement texture in suitable image editing software before replacement. The mapping in the MTT doesn't perform any [dithering](https://en.wikipedia.org/wiki/Dither).
     * See below for instructions on how to map an image's colours to a palette using GIMP.
 * Save a Maxis composite bitmap file with your changes.
   * Copy your modified file to the game's `bmp` folder, make a copy of the original file, and rename your file appropriately.

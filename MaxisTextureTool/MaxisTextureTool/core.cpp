@@ -548,9 +548,13 @@ void Frame::OnReplaceCurrent(wxCommandEvent& WXUNUSED(event))
 				int r, g, b;
 				std::tie(r, g, b) = palette[curPal];
 
-				// Something perceptually-weighted would be better but this is cheap.
-				int curError = std::abs(newR - r) + std::abs(newG - g) + std::abs(newB - b);
-				
+				// CompuPhase metric (see https://www.compuphase.com/cmetric.htm).
+				// More nuanced metrics are available (see https://en.wikipedia.org/wiki/Color_difference), but the CompuPhase metric is cheap and reasonably good.
+				int redFactor = newR < 128 ? 2 : 3;
+				const int greenFactor = 4;
+				int blueFactor = newR < 128 ? 3 : 2;
+				int curError = redFactor * (newR - r) * (newR - r) + greenFactor * (newG - g) * (newG - g) + blueFactor * (newB - b) * (newB - b);
+
 				if (curPal == paletteStartOffset || curError < minError) {
 					indexBest = curPal;
 					minError = curError;
@@ -640,7 +644,7 @@ void Frame::OnHelp(wxCommandEvent& WXUNUSED(event)) {
 void Frame::OnAbout(wxCommandEvent& WXUNUSED(event)) {
 	wxString message;
 	message << "Maxis Texture Tool\n"
-		<< "Version 1.0.1\n"
+		<< "Version 1.0.2\n"
 		<< "Created by Luke Gane (a.k.a. Cahoots Malone)";
 	wxMessageBox(message, "About", wxOK);
 }
