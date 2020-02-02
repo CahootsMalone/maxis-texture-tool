@@ -43,6 +43,7 @@ class Frame : public wxFrame {
 		wxButton *exportAllTextures;
 		wxButton *replaceCurrent;
 		wxButton *saveTextureFile;
+		wxButton* addTexture;
 		wxButton *help;
 		wxButton *about;
 
@@ -57,6 +58,7 @@ class Frame : public wxFrame {
 		void OnExportAllTextures(wxCommandEvent& WXUNUSED(event));
 		void OnReplaceCurrent(wxCommandEvent& WXUNUSED(event));
 		void OnSaveTextureFile(wxCommandEvent& WXUNUSED(event));
+		void OnAddTexture(wxCommandEvent& WXUNUSED(event));
 		void OnHelp(wxCommandEvent& WXUNUSED(event));
 		void OnAbout(wxCommandEvent& WXUNUSED(event));
 

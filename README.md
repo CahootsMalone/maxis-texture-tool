@@ -1,6 +1,6 @@
 # Maxis Texture Tool
 
-This program can view, export, and replace images contained in Maxis composite bitmap files matching the format of those used to store the textures for [SimCopter](https://en.wikipedia.org/wiki/SimCopter) and [Streets of SimCity](https://en.wikipedia.org/wiki/Streets_of_SimCity).
+This program can view and edit Maxis composite bitmap files matching the format of those used to store the textures for [SimCopter](https://en.wikipedia.org/wiki/SimCopter) and [Streets of SimCity](https://en.wikipedia.org/wiki/Streets_of_SimCity).
 
 Recommended for use with [SimCopterX](http://simcopter.net) or [SimStreetsX](http://www.streetsofsimcity.com/), which not only patch both games to ensure reliable operation when run under modern versions of Windows but also ensure that they use local resource files (when installed 1990s-style, both games usually load resource files from their CDs even when the installer has copied them to the hard drive). This means you can modify textures using this program, save a Maxis composite bitmap file with your changes, replace the original file (first making a backup, of course), and see your changes in-game when running via SimCopterX or SimStreetsX.
 

@@ -80,6 +80,10 @@ Frame::Frame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDefaultPo
 	saveTextureFile->Bind(wxEVT_BUTTON, &Frame::OnSaveTextureFile, this);
 	saveTextureFile->SetToolTip("Save the Maxis composite bitmap file, including any modifications.");
 
+	addTexture = new wxButton(panel1, wxID_ANY, "Add Texture");
+	addTexture->Bind(wxEVT_BUTTON, &Frame::OnAddTexture, this);
+	addTexture->SetToolTip("Add a new texture at the end of the file.");
+
 	help = new wxButton(panel1, wxID_ANY, "Help");
 	help->Bind(wxEVT_BUTTON, &Frame::OnHelp, this);
 
@@ -121,6 +125,7 @@ Frame::Frame(const wxString& title) : wxFrame(NULL, wxID_ANY, title, wxDefaultPo
 	sBSizerTexture->Add(bSizerGoTo, 0, wxEXPAND, 0);
 	sBSizerTexture->Add(bSizerExport, 0, wxEXPAND, 0);
 	sBSizerTexture->Add(bSizerModify, 0, wxEXPAND, 0);
+	sBSizerTexture->Add(addTexture, 0, wxALIGN_CENTER | wxALL, 0);
 
 	bSizer1->Add(sBSizerTexture, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, margin);
 	
@@ -615,6 +620,185 @@ void Frame::OnSaveTextureFile(wxCommandEvent& WXUNUSED(event)) {
 	file.Close();
 }
 
+// TODO lots of this is just copied from the code that replaces a texture, should spin off into some helper functions.
+void Frame::OnAddTexture(wxCommandEvent& WXUNUSED(event)) {
+	if (!IsTextureFileLoaded()) {
+		wxMessageBox("Please load a file.", "Information", wxOK | wxICON_INFORMATION);
+		return;
+	}
+
+	wxString openMessage;
+	openMessage << "Select an image";
+	wxFileDialog openFileDialog(this, openMessage, wxEmptyString, wxEmptyString, "PNG files (*.png)|*.png", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+	int result = openFileDialog.ShowModal();
+
+	if (result == wxID_CANCEL) {
+		return;
+	}
+
+	wxImage newTexture;
+	newTexture.LoadFile(openFileDialog.GetPath());
+
+	int rowCount = newTexture.GetHeight();
+	int colCount = newTexture.GetWidth();
+
+	int bytesRequiredCount = 12 + rowCount * 4 + rowCount * colCount;
+	
+	std::vector<unsigned char> imageBytes(bytesRequiredCount, 0);
+
+	// Fill in dimensions and value that's always zero.
+	Helpers::Int32ToBytes(colCount, imageBytes.data());
+	Helpers::Int32ToBytes(rowCount, imageBytes.data()+4);
+	Helpers::Int32ToBytes(0, imageBytes.data()+8);
+
+	// Fill in row offset table.
+	for (int i = 0; i < rowCount; ++i) {
+		Helpers::Int32ToBytes(i*colCount, imageBytes.data() + 12 + i*4);
+	}
+
+	int dataStart = 12 + rowCount * 4;
+
+	wxProgressDialog progressDialog("Mapping colours to palette...", "...", colCount * rowCount, this, wxPD_APP_MODAL | wxPD_AUTO_HIDE);
+
+	int pixelsReplacedCount = 0;
+	unsigned char* newTextureData = newTexture.GetData();
+	bool newTextureHasAlphaChannel = newTexture.HasAlpha();
+
+	// For colours that aren't in the palette.
+	std::unordered_map<int, int> nearestMatches;
+
+	// If the first palette colour is being treated as transparent,
+	// don't check it when mapping colours to palette indices.
+	// Otherwise pixels may end up unintentionally transparent in-game.
+	int paletteStartOffset = firstColourTransparent ? 1 : 0;
+
+	for (int curRow = 0; curRow < rowCount; ++curRow)
+	{
+		for (int curCol = 0; curCol < colCount; ++curCol)
+		{
+			int newR = newTextureData[3 * curRow * colCount + 3 * curCol];
+			int newG = newTextureData[3 * curRow * colCount + 3 * curCol + 1];
+			int newB = newTextureData[3 * curRow * colCount + 3 * curCol + 2];
+
+			int address = dataStart + curCol + curRow * colCount;
+
+			if (firstColourTransparent && newTextureHasAlphaChannel && newTexture.GetAlpha(curCol, curRow) == wxIMAGE_ALPHA_TRANSPARENT)
+			{
+				imageBytes[address] = 0;
+				continue;
+			}
+
+			// Find exact match if possible.
+			std::vector<std::tuple<int, int, int>>::iterator it;
+			it = std::find(palette.begin() + paletteStartOffset, palette.end(), std::make_tuple(newR, newG, newB));
+			if (it != palette.end())
+			{
+				imageBytes[address] = std::distance(palette.begin(), it);
+				continue;
+			}
+
+			// No exact match; new colour will need to be replaced with nearest in palette.
+			++pixelsReplacedCount;
+
+			// Check if a nearest match was already found for this colour.
+			int key = newR + 1000 * newG + 1000000 * newB;
+			auto existingNearest = nearestMatches.find(key);
+			if (existingNearest != nearestMatches.end())
+			{
+				imageBytes[address] = existingNearest->second;
+				continue;
+			}
+
+			// Find palette colour closest to new one.
+			int indexBest;
+			int minError;
+			for (size_t curPal = paletteStartOffset; curPal < palette.size(); ++curPal)
+			{
+				int r, g, b;
+				std::tie(r, g, b) = palette[curPal];
+
+				// CompuPhase metric (see https://www.compuphase.com/cmetric.htm).
+				// More nuanced metrics are available (see https://en.wikipedia.org/wiki/Color_difference), but the CompuPhase metric is cheap and reasonably good.
+				int redFactor = newR < 128 ? 2 : 3;
+				const int greenFactor = 4;
+				int blueFactor = newR < 128 ? 3 : 2;
+				int curError = redFactor * (newR - r) * (newR - r) + greenFactor * (newG - g) * (newG - g) + blueFactor * (newB - b) * (newB - b);
+
+				if (curPal == paletteStartOffset || curError < minError) {
+					indexBest = curPal;
+					minError = curError;
+				}
+			}
+
+			/*
+			// This isn't any faster than using a raw loop.
+			it = std::min_element(palette.begin(), palette.end(), [=](const std::tuple<int,int,int> &a, const std::tuple<int, int, int> &b) {
+				int rA, gA, bA;
+				std::tie(rA, gA, bA) = a;
+				int rB, gB, bB;
+				std::tie(rB, gB, bB) = b;
+
+				int errorA = std::abs(newR - rA) + std::abs(newG - gA) + std::abs(newB - bA);
+				int errorB = std::abs(newR - rB) + std::abs(newG - gB) + std::abs(newB - bB);
+
+				return errorA < errorB;
+			});
+			int indexBest = std::distance(palette.begin(), it);
+			*/
+
+			nearestMatches[key] = indexBest;
+			imageBytes[address] = indexBest;
+		}
+
+		// Only update progress once per row (each update adds delay).
+		wxString progressMessage;
+		progressMessage << "Pixel " << curRow * colCount + colCount << " of " << rowCount * colCount;
+		progressDialog.Update(curRow * colCount + colCount, progressMessage);
+	}
+
+	if (pixelsReplacedCount != 0) {
+		wxString message;
+		message << pixelsReplacedCount << " pixels were replaced with the nearest palette colour.";
+		wxMessageBox(message, "Information", wxOK | wxICON_INFORMATION);
+	}
+
+	// Append new texture to end of file.
+	fileBytes.insert(fileBytes.end(), imageBytes.begin(), imageBytes.end());
+
+	// Add entry to resolutions table.
+	std::vector<unsigned char> newResTableEntry(12, 0);
+	Helpers::Int32ToBytes(colCount, newResTableEntry.data());
+	Helpers::Int32ToBytes(rowCount, newResTableEntry.data()+4);
+	Helpers::Int32ToBytes(0, newResTableEntry.data()+8);
+	int endOfResTable = 16 + imageCount * 12;
+	fileBytes.insert(fileBytes.begin()+endOfResTable, newResTableEntry.begin(), newResTableEntry.end());
+
+	// Update file info.
+	++imageCount;
+	Helpers::Int32ToBytes(fileBytes.size(), fileBytes.data());
+	Helpers::Int32ToBytes(imageCount, fileBytes.data()+8);
+	Helpers::Int32ToBytes(imageCount, fileBytes.data()+12);
+
+	// Set current texture to the one that was just added.
+	curImage = imageCount - 1;
+
+	// Regenerate list of start offsets (TODO: make common function).
+	starts = std::vector<int>(imageCount);
+
+	int current = 16 + imageCount*12;
+	for (int i = 0; i < imageCount; ++i) {
+		starts[i] = current;
+
+		int colCount = Helpers::BytesToInt32(fileBytes.data() + current); // X
+		int rowCount = Helpers::BytesToInt32(fileBytes.data() + current + 4); // Y
+		int dataStart = current + 3 * 4 + rowCount * 4;
+
+		current = current + 3 * 4 + rowCount * 4 + colCount * rowCount;
+	}
+
+	UpdateImage();
+}
+
 void Frame::OnHelp(wxCommandEvent& WXUNUSED(event)) {
 	wxString message;
 	message << "This program supports SimCopter and Streets of SimCity.\n"
@@ -771,6 +955,7 @@ void Frame::SetControlState(int state)
 			exportAllTextures->Disable();
 			replaceCurrent->Disable();
 			saveTextureFile->Disable();
+			addTexture->Disable();
 			break;
 		case 1: // Palette, no texture file.
 			loadPalette->Enable();
@@ -785,6 +970,7 @@ void Frame::SetControlState(int state)
 			exportAllTextures->Disable();
 			replaceCurrent->Disable();
 			saveTextureFile->Disable();
+			addTexture->Disable();
 			break;
 		case 2: // Palette and texture file.
 			loadPalette->Enable();
@@ -799,6 +985,7 @@ void Frame::SetControlState(int state)
 			exportAllTextures->Enable();
 			replaceCurrent->Enable();
 			saveTextureFile->Enable();
+			addTexture->Enable();
 			break;
 	}
 }
