@@ -828,7 +828,7 @@ void Frame::OnHelp(wxCommandEvent& WXUNUSED(event)) {
 void Frame::OnAbout(wxCommandEvent& WXUNUSED(event)) {
 	wxString message;
 	message << "Maxis Texture Tool\n"
-		<< "Version 1.0.2\n"
+		<< "Version 1.0.3\n"
 		<< "Created by Luke Gane (a.k.a. Cahoots Malone)";
 	wxMessageBox(message, "About", wxOK);
 }
